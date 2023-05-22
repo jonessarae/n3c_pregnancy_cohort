@@ -1,22 +1,95 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.4ebc2f66-7ba6-470c-afc1-30c4e6f2a569"),
-    get_timing_concepts=Input(rid="ri.foundry.main.dataset.fdc129f8-afd3-42b4-8757-d7009176390f")
-)
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from pyspark.sql.types import IntegerType, DateType, DoubleType, ArrayType, StringType, TimestampType, StructField, StructType
+from pyspark.sql.functions import unix_timestamp, udf
+import pandas as pd
+import itertools
+import time
+from datetime import datetime
+from datetime import timedelta
+import numpy as np
+
+# external files
+Matcho_term_durations = "Matcho_term_durations.xlsx"
+specific_gestational_timing_concepts = "PPS_concepts.xlsx"
+
+def get_timing_concepts(condition_occurrence, observation, measurement, procedure_occurrence, final_merged_episode_detailed, specific_gestational_timing_concepts):
+    """
+    Get gestational timing related concepts for each pregnant person.
+    """
+    # obtain the gestational timing <= 3 month concept information to use as additional information for precision category designation
+    algo2_timing_concepts_df = specific_gestational_timing_concepts.select('domain_concept_id','min_month','max_month')
+    algo2_timing_concepts_id_list = algo2_timing_concepts_df.select('domain_concept_id').rdd.flatMap(lambda x: x).collect()
+
+    pregnant_dates = final_merged_episode_detailed
+    c_o = condition_occurrence
+    o_df = observation
+    m_df = measurement
+    p_df = procedure_occurrence
+
+    observation_concept_list = [3011536, 3026070, 3024261, 4260747,40758410, 3002549, 43054890, 46234792, 4266763, 40485048, 3048230, 3002209, 3012266]
+    measurement_concept_list = [3036844, 3048230, 3001105, 3002209, 3050433, 3012266]
+
+    est_date_of_delivery_concepts = [1175623, 1175623, 3001105, 3011536, 3024261, 3024973, 3026070, 3036322, 3038318, 3038608, 4059478, 4128833, 40490322, 40760182, 40760183, 42537958]
+    est_date_of_conception_concepts = [3002314, 3043737, 4058439, 4072438, 4089559, 44817092]
+    len_of_gestation_at_birth_concepts = [4260747, 43054890, 46234792, 4266763, 40485048]
+
+    c_o = c_o.filter((F.lower(F.col('condition_concept_name')).contains('gestation period,')) | (F.col('condition_concept_id').isin(observation_concept_list)) | (F.col('condition_concept_id').isin(measurement_concept_list)) | (F.col('condition_concept_id').isin(algo2_timing_concepts_id_list)) | (F.col('condition_concept_id').isin(est_date_of_delivery_concepts)) | (F.col('condition_concept_id').isin(est_date_of_conception_concepts)) | (F.col('condition_concept_id').isin(len_of_gestation_at_birth_concepts)))
+
+    o_df = o_df.filter((F.lower(F.col('observation_concept_name')).contains('gestation period,')) | (F.col('observation_concept_id').isin(observation_concept_list)) | (F.col('observation_concept_id').isin(measurement_concept_list)) | (F.col('observation_concept_id').isin(algo2_timing_concepts_id_list)) | (F.col('observation_concept_id').isin(est_date_of_delivery_concepts)) | (F.col('observation_concept_id').isin(est_date_of_conception_concepts)) | (F.col('observation_concept_id').isin(len_of_gestation_at_birth_concepts)))
+
+    m_df = m_df.filter((F.lower(F.col('measurement_concept_name')).contains('gestation period,')) | (F.col('measurement_concept_id').isin(observation_concept_list)) | (F.col('measurement_concept_id').isin(measurement_concept_list)) | (F.col('measurement_concept_id').isin(algo2_timing_concepts_id_list)) | (F.col('measurement_concept_id').isin(est_date_of_delivery_concepts))| (F.col('measurement_concept_id').isin(est_date_of_conception_concepts))| (F.col('measurement_concept_id').isin(len_of_gestation_at_birth_concepts)))
+
+    p_df = p_df.filter((F.lower(F.col('procedure_concept_name')).contains('gestation period,')) | (F.col('procedure_concept_id').isin(observation_concept_list)) | (F.col('procedure_concept_id').isin(measurement_concept_list)) | (F.col('procedure_concept_id').isin(algo2_timing_concepts_id_list))| (F.col('procedure_concept_id').isin(est_date_of_delivery_concepts))| (F.col('procedure_concept_id').isin(est_date_of_conception_concepts))| (F.col('procedure_concept_id').isin(len_of_gestation_at_birth_concepts)))
+
+    pregnant_dates = pregnant_dates.withColumnRenamed('person_id','personID')
+
+    def get_preg_related_concepts(preg_dates,df,df_date_col,id_col,name_col,val_col):
+
+        pregnant_persons = df.join(preg_dates, (F.col('person_id') == preg_dates.personID) & (F.col(df_date_col) >= preg_dates.recorded_episode_start) & (F.col(df_date_col) <= preg_dates.recorded_episode_end),'inner').drop('personID')
+
+        pregnant_persons = pregnant_persons.withColumnRenamed(df_date_col, 'domain_concept_start_date')
+        pregnant_persons = pregnant_persons.withColumnRenamed(id_col, 'domain_concept_id')
+        pregnant_persons = pregnant_persons.withColumnRenamed(name_col, 'domain_concept_name')
+        pregnant_persons = pregnant_persons.withColumnRenamed(val_col, 'domain_value')
+
+        pregnant_persons = pregnant_persons.select('person_id','domain_concept_start_date','domain_concept_id','domain_concept_name','episode_number','recorded_episode_start','recorded_episode_end','domain_value')
+        return pregnant_persons
+    
+    c_o = c_o.withColumn('value_col',F.col('condition_concept_name'))
+    p_df = p_df.withColumn('value_col',F.col('procedure_concept_name'))
+    c_o = get_preg_related_concepts(pregnant_dates,c_o,'condition_start_date','condition_concept_id','condition_concept_name','value_col')
+    o_df = get_preg_related_concepts(pregnant_dates,o_df,'observation_date','observation_concept_id','observation_concept_name','value_as_string')
+    m_df = get_preg_related_concepts(pregnant_dates,m_df,'measurement_date','measurement_concept_id','measurement_concept_name','value_as_number')
+    p_df = get_preg_related_concepts(pregnant_dates,p_df,'procedure_date','procedure_concept_id','procedure_concept_name','value_col')
+
+    preg_related_concepts = ((c_o.unionByName(o_df)).unionByName(m_df)).unionByName(p_df)
+
+    # get gestational timing values
+    preg_related_concepts = preg_related_concepts.withColumn('domain_value', F.regexp_replace('domain_value', '|text_result_val:', ''))
+    preg_related_concepts = preg_related_concepts.withColumn('domain_value', F.regexp_replace('domain_value', '|mapped_text_result_val:', ''))
+    preg_related_concepts = preg_related_concepts.withColumn('domain_value', F.regexp_replace('domain_value', 'Gestation period, ', ''))
+    preg_related_concepts = preg_related_concepts.withColumn('domain_value', F.regexp_replace('domain_value', 'gestation period, ', ''))
+    preg_related_concepts = preg_related_concepts.withColumn('domain_value', F.regexp_replace('domain_value', ' weeks', ''))
+   
+    # cast values to integer type
+    preg_related_concepts = preg_related_concepts.withColumn("domain_value",preg_related_concepts.domain_value.cast(IntegerType()))
+    
+    # 3048230 = Gestational age in weeks
+    # 3002209 - Gestational age Estimated
+    # 3012266- Gestational age 
+    # extrapolate start date 
+    preg_related_concepts = preg_related_concepts.withColumn('extrapolated_preg_start', F.when(F.lower(F.col('domain_concept_name')).contains('gestation period,'),F.expr("date_sub(domain_concept_start_date, (domain_value*7))")).when((F.col('domain_concept_id').isin([3048230,3002209,3012266])) & (F.col("domain_value") < 44), F.expr("date_sub(domain_concept_start_date, (domain_value*7))")).otherwise(''))
+    
+    # add on any range information where necessary (from the concepts that span <= 3 months during pregnancy)
+    preg_related_concepts = preg_related_concepts.join(algo2_timing_concepts_df,'domain_concept_id','left')
+
+    return preg_related_concepts
+
 def episodes_with_gestational_timing_info(get_timing_concepts):
     """
     Estimated Start Date Algorithm - add on the following pieces of information: precision in days, precision category, and inferred start date.
     """
-    from pyspark.sql import functions as F
-    from pyspark.sql.types import IntegerType, DateType, DoubleType, ArrayType, StringType, TimestampType, StructField, StructType
-    import pandas as pd
-    from pyspark.sql.functions import unix_timestamp, udf
-    import itertools
-    import time
-    from datetime import datetime
-    from datetime import timedelta
-    import numpy as np
-    from pyspark.sql import Window
-
     df = get_timing_concepts
     
     # add on either GW or GR3m designation depending on whether the concept is present
@@ -379,19 +452,11 @@ def episodes_with_gestational_timing_info(get_timing_concepts):
 
     return timing_designation_df
     
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.afad168a-592f-44a7-bd1b-24d558d90a8a"),
-    Matcho_term_durations=Input(rid="ri.foundry.main.dataset.9519459a-b61a-4123-b798-f62723695b8d"),
-    episodes_with_gestational_timing_info=Input(rid="ri.foundry.main.dataset.4ebc2f66-7ba6-470c-afc1-30c4e6f2a569"),
-    final_merged_episode_detailed_old=Input(rid="ri.foundry.main.dataset.a54c6379-349e-4ec9-92cd-deab46490e26")
-)
-def merged_episodes_with_metadata(episodes_with_gestational_timing_info, final_merged_episode_detailed_old, Matcho_term_durations):
+def merged_episodes_with_metadata(episodes_with_gestational_timing_info, final_merged_episode_detailed, Matcho_term_durations):
     """
     Add other pregnancy and demographic related info for each episode.
     """
-
-    demographics_df = final_merged_episode_detailed_old
+    demographics_df = final_merged_episode_detailed
     timing_df = episodes_with_gestational_timing_info.drop('GT_info_list')
     term_max_min = Matcho_term_durations
 
@@ -506,10 +571,10 @@ def merged_episodes_with_metadata(episodes_with_gestational_timing_info, final_m
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
+def main():
+    get_timing_concepts_df = get_timing_concepts(condition_occurrence, observation, measurement, procedure_occurrence, final_merged_episode_detailed_df, specific_gestational_timing_concepts)
+    episodes_with_gestational_timing_info_df = episodes_with_gestational_timing_info(get_timing_concepts_df)
+    merged_episodes_with_metadata_df = merged_episodes_with_metadata(episodes_with_gestational_timing_info_df, final_merged_episode_detailed_df, Matcho_term_durations)
 
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.types import DateType, DoubleType,ArrayType, StringType, IntegerType
+if __name__ == "__main__":
+    main()
