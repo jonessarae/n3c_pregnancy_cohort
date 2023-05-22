@@ -18,6 +18,6 @@ Small-scale data where Spark is not feasible:
 We would like to work with sites to adapt the code to their data, please reach out to Sara Jones (sara.jones2@nih.gov) or Kate Bradwell (kbradwell@palantir.com) to develop a pandas version of the code if the size of data will remain stable and only needs to run on a single machine.
 
 #### Cases where data is not in the OMOP Common Data Model
-This will require source data mapping, e.g. a) conversion of concepts used by the algorithm from OMOP to your local Common Data Model (ACT, PCORnet etc), or b) conversion from source EHR to OMOP. Please reach out to Sara Jones (sara.jones2@nih.gov) or kbradwell@palantir.com to provide the mapping tools and assistance for these conversions.
+This will require source data mapping, e.g. a) conversion of concepts used by the algorithm from OMOP to your local Common Data Model (ACT, PCORnet etc), or b) conversion from source EHR to OMOP. Please reach out to Sara Jones (sara.jones2@nih.gov) or Kate Bradwell (kbradwell@palantir.com) to provide the mapping tools and assistance for these conversions.
 
 We would like to offer assistance wherever necessary to ensure this resource is widely used. Any resulting adaptations of the code will be fully attributed to the relevant clinical sites and made widely available to benefit other sites intending to perform either research or operational workflows on their pregnant population.
