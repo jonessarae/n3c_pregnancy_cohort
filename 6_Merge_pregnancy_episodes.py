@@ -1,44 +1,28 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.243bd07d-5d64-4236-b1b3-6a3d1fa28e21"),
-    HIP_concepts=Input(rid="ri.foundry.main.dataset.9abc8da4-cd3c-43d6-a6a5-f52a5baf398e")
-)
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
+from pyspark.sql.types import DateType, DoubleType, ArrayType, StringType, IntegerType 
+import datetime as dt
+from pyspark.sql.functions import pandas_udf, PandasUDFType
+
+# external files
+HIP_concepts = "HIP_concepts.xlsx"
+
 def filter_to_any_outcome(HIP_concepts):
     df = HIP_concepts
     df = df.where(F.col("category").isin({"LB", "SB", "DELIV", "ECT", "AB", "SA"}))
     df = df.select('concept_id','concept_name','category').distinct()
     return df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.types import DateType, DoubleType,ArrayType, StringType, IntegerType 
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.45be46d3-ea37-444b-a25d-02c6ba33fc08"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    filter_to_any_outcome=Input(rid="ri.foundry.main.dataset.243bd07d-5d64-4236-b1b3-6a3d1fa28e21"),
-    get_episode_max_min_dates=Input(rid="ri.foundry.main.dataset.6412d917-6d85-4690-9aab-cd41c879a3fc"),
-    get_episodes=Input(rid="ri.foundry.main.dataset.98d36cb4-5706-4489-b714-4ab930310b4c"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
-def outcomes_per_episode( procedure_occurrence, condition_occurrence, measurement, observation, get_episode_max_min_dates, filter_to_any_outcome, get_episodes):
+def outcomes_per_episode(procedure_occurrence, condition_occurrence, measurement, observation, PPS_episodes, filter_to_any_outcome, get_PPS_episodes):
     """
     Get outcomes for Algorithm 2:
     Outcomes are collected from a 'lookback to lookahead window', which is the episode max date minus 14d to the earliest out of i) the next closest episode start date or ii) a number of months of length (10 months - the earliest concept month that could relate to the end of the episode)
     """
-    from pyspark.sql.functions import pandas_udf, PandasUDFType
-
     df = filter_to_any_outcome
     concept_list = list(df.select('concept_id').toPandas()['concept_id'])
-    from pyspark.sql.types import DateType, DoubleType
 
-    pregnant_dates = get_episode_max_min_dates
+    pregnant_dates = PPS_episodes
 
     # for each episode, get the date corresponding to the next closest episode, in a new column called 'next_closest_episode_date'
     tmp_pregnant_dates = pregnant_dates.sort(F.col('personID'),F.col('person_episode_number'),F.col('episode_min_date')).filter(F.col('person_episode_number') > 1).withColumn('new_person_episode_number', (F.col('person_episode_number') - 1)) \
@@ -50,7 +34,7 @@ def outcomes_per_episode( procedure_occurrence, condition_occurrence, measuremen
 
     pregnant_dates = pregnant_dates.withColumn('next_closest_episode_date', F.date_add(pregnant_dates['next_closest_episode_date'], -1))
 
-    preg_episode_concept_GA = get_episodes
+    preg_episode_concept_GA = get_PPS_episodes
 
     # get the max number of months to look ahead from the episode itself, in a new column called 'max_pregnancy_date'
     ''' do this by saving the concept date relating to the last episode concept (if multiple on the same date then the one containing max month), of which the min month is used out of the tuple of month values where necessary and subtracted from 10,
@@ -163,49 +147,20 @@ def outcomes_per_episode( procedure_occurrence, condition_occurrence, measuremen
 
     return df1
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.types import DateType, DoubleType,ArrayType, StringType, IntegerType
-import datetime as dt
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.a415921d-7092-464c-9177-b0be50b775fd"),
-    get_episode_max_min_dates=Input(rid="ri.foundry.main.dataset.6412d917-6d85-4690-9aab-cd41c879a3fc"),
-    outcomes_per_episode=Input(rid="ri.foundry.main.dataset.45be46d3-ea37-444b-a25d-02c6ba33fc08")
-)
-def add_outcomes(outcomes_per_episode, get_episode_max_min_dates):
+def add_outcomes(outcomes_per_episode, PPS_episodes):
     """
     Join outcomes for Algo 2 to main Algo 2 table.
     """
     out_df = outcomes_per_episode.select("person_id","person_episode_number","episode_min_date","algo2_category","algo2_outcome_date")
     out_df = out_df.withColumnRenamed("person_episode_number", "person_episode_num")
     out_df = out_df.withColumnRenamed("episode_min_date", "episode_minDate")
-    df = get_episode_max_min_dates
+    df = PPS_episodes
     df = df.join(out_df, on = [df.personID == out_df.person_id, df.person_episode_number == out_df.person_episode_num, df.episode_min_date == out_df.episode_minDate], how="left")
     df = df.drop("person_id","person_episode_num","episode_minDate")
 
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.types import DateType, DoubleType,ArrayType, StringType, IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.002ba763-6d24-4737-83c9-277fd24353ce"),
-    add_outcomes=Input(rid="ri.foundry.main.dataset.a415921d-7092-464c-9177-b0be50b775fd"),
-    final_episodes_with_length=Input(rid="ri.foundry.main.dataset.1da2194d-3770-4152-a468-8b4d0661ba86")
-)
-def final_merged_episodes(final_episodes_with_length, add_outcomes):
+def final_merged_episodes(HIP_episodes, PPS_episodes):
     """
     Merge episodes by checking for any overlap of episodes between the two algorithms.
     
@@ -222,8 +177,8 @@ def final_merged_episodes(final_episodes_with_length, add_outcomes):
     - end in algo1 is within algo2
     - end in algo2 is within algo1
     """
-    algo1_pregnancy = final_episodes_with_length
-    algo2 = add_outcomes
+    algo1_pregnancy = HIP_episodes
+    algo2 = PPS_episodes
 
     # rename columns in algorithm 1
     algo1_pregnancy = algo1_pregnancy.withColumnRenamed('estimated_start_date','pregnancy_start')
@@ -272,17 +227,6 @@ def final_merged_episodes(final_episodes_with_length, add_outcomes):
 
     return all_episodes
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
- 
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.3dc8d251-4a04-4ab8-ba77-b7464774ed3e"),
-    final_merged_episodes_old=Input(rid="ri.foundry.main.dataset.39d38731-1dba-40fe-903e-95f91c4fb720")
-)
 def final_merged_episodes_no_duplicates(final_merged_episodes):
     """
     Remove any episodes that overlap with more than one episode. 
@@ -291,10 +235,6 @@ def final_merged_episodes_no_duplicates(final_merged_episodes):
     2. Any remaining duplicated algorithm 1 episodes may have more than one algorithm 2 episodes with the same date difference in days. Calculate the length of algorithm 2 episodes and keep only the longest algorithm 2 episode. For any algorithm 2 episode that doesn't meet this criteria, both the algorithm 1 and 2 episode info are converted to null.
     3. Next repeat the same process described in Step 1 for duplicated algorithm 2 episodes.
     """
-
-    from pyspark.sql.window import Window
-    from pyspark.sql.functions import row_number
-
     df = final_merged_episodes
     df = df.withColumn("person_identifier", F.coalesce("person_id","personID"))
     df = df.drop("person_id","person_ID")
@@ -397,18 +337,6 @@ def final_merged_episodes_no_duplicates(final_merged_episodes):
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-    
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.bcba58af-82f9-4611-a35f-a2ce80e99e75"),
-    final_merged_episodes_no_duplicates_old=Input(rid="ri.foundry.main.dataset.3dc8d251-4a04-4ab8-ba77-b7464774ed3e"),
-    person=Input(rid="ri.foundry.main.dataset.14c52391-0344-41ac-909a-71f8e19704d6")
-)
 def final_merged_episode_detailed(final_merged_episodes_no_duplicates, person):
     """
     Add demographic details for each patient.
@@ -440,11 +368,17 @@ def final_merged_episode_detailed(final_merged_episodes_no_duplicates, person):
     final_df = df.withColumn("episode_number", row_number().over(Window.partitionBy("person_id").orderBy("person_id","recorded_episode_start")))
     
     return final_df
-    
-#################################################
-## Global imports and functions included below ##
-#################################################
 
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.functions import row_number
+def main():
+    # add outcomes to PPS episodes
+    filter_to_any_outcome_df = filter_to_any_outcome(HIP_concepts)
+    outcomes_per_episode(procedure_occurrence, condition_occurrence, measurement, observation, PPS_episodes_df, filter_to_any_outcome_df, get_PPS_episodes_df)
+    PPS_episodes_with_outcomes_df = add_outcomes(outcomes_per_episode_df, PPS_episodes_df)
+
+    # merge HIP and PPS episodes
+    final_merged_episodes_df = final_merged_episodes(HIP_episodes_df, PPS_episodes_with_outcomes_df)
+    final_merged_episodes_no_duplicates_df = final_merged_episodes_no_duplicates(final_merged_episodes_df)
+    final_merged_episode_detailed_df = final_merged_episode_detailed(final_merged_episodes_no_duplicates_df, person)
+
+if __name__ == "__main__":
+    main()
