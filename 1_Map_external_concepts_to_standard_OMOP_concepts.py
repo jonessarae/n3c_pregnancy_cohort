@@ -88,7 +88,7 @@ def main():
     filter_standard_df = filter_standard(concepts_in_enclave_df)
     map_to_standard_df = map_to_standard(filter_non_standard_df, concept_relationship)
     get_standard_columns_df = get_standard_columns(map_to_standard_df, concept)
-    Matcho_concepts_df = combine_tables(get_standard_columns_df, filter_standard)
+    Matcho_concepts_df = combine_tables(get_standard_columns_df, filter_standard_df)
 
 if __name__ == "__main__":
     main()
