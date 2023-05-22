@@ -1,6 +1,15 @@
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.sql.types import DateType
+from pyspark.sql.functions import expr
+from itertools import chain
+from pyspark.sql.types import ArrayType, IntegerType, DateType, StructType
+import pandas as pd
+import operator
+from pyspark.sql.functions import pandas_udf,PandasUDFType
+import collections
+from pyspark.sql import Row
+import datetime
 
 # external files
 PPS_concepts = "PPS_concepts.xlsx"
@@ -40,16 +49,6 @@ def input_GT_concepts(condition_occurrence, procedure_occurrence, observation, m
     return top_preg_related_concepts
 
 def get_PPS_episodes(PPS_concepts, input_GT_concepts, person):
-    from itertools import chain
-    from pyspark.sql.types import ArrayType, IntegerType, DateType, StructType
-    import pandas as pd
-    import operator
-    from pyspark.sql.functions import pandas_udf,PandasUDFType
-    import pandas as pd
-    import collections
-    from pyspark.sql import Row
-    import datetime
-
     '''
     OBTAIN ALL RELEVANT INPUT PATIENTS AND SAVE GT INFORMATION PER CONCEPT TO A LOOKUP DICTIONARY 
     First we save the women that have gestational timing concepts, and save the gestational timing information for each concept.
@@ -252,7 +251,6 @@ def get_PPS_episodes(PPS_concepts, input_GT_concepts, person):
     return preg_df
 
 def get_episode_max_min_dates(get_PPS_episodes):
-    from pyspark.sql.functions import expr
     df = get_PPS_episodes
     df = df.groupby('personID','person_episode_number').agg(F.min(F.col('conceptDate')).alias('episode_min_date'),F.max(F.col('conceptDate')).alias('episode_max_date'))
     df = df.withColumn('episode_max_date_plus_two_months', expr("add_months(episode_max_date, 2)"))
