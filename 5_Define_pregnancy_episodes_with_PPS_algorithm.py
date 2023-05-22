@@ -1,12 +1,10 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.a84f3051-b670-41ff-8efb-2b7273dca1f8"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631"),
-    PPS_concepts=Input(rid="ri.foundry.main.dataset.1eba5351-3f6f-4c89-a1bd-e9ca77a31d90"),
-    visit_occurrence=Input(rid="ri.foundry.main.dataset.2911e333-a8d4-49ab-b5fd-6765cfec4400")
-)
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from pyspark.sql.types import DateType
+
+# external files
+PPS_concepts = "PPS_concepts.xlsx"
+
 def input_GT_concepts(condition_occurrence, procedure_occurrence, observation, measurement, visit_occurrence, PPS_concepts):
     c_o = condition_occurrence
     p_o = procedure_occurrence
@@ -41,21 +39,6 @@ def input_GT_concepts(condition_occurrence, procedure_occurrence, observation, m
 
     return top_preg_related_concepts
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql.types import DateType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.98d36cb4-5706-4489-b714-4ab930310b4c"),
-    PPS_concepts=Input(rid="ri.foundry.main.dataset.255d9173-4d3d-491c-a76a-50f0d3cc2083"),
-    input_GT_concepts=Input(rid="ri.foundry.main.dataset.a84f3051-b670-41ff-8efb-2b7273dca1f8"),
-    person=Input(rid="ri.foundry.main.dataset.14c52391-0344-41ac-909a-71f8e19704d6")
-)
 def get_PPS_episodes(PPS_concepts, input_GT_concepts, person):
     from itertools import chain
     from pyspark.sql.types import ArrayType, IntegerType, DateType, StructType
@@ -268,28 +251,17 @@ def get_PPS_episodes(PPS_concepts, input_GT_concepts, person):
 
     return preg_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.6412d917-6d85-4690-9aab-cd41c879a3fc"),
-    get_PPS_episodes=Input(rid="ri.foundry.main.dataset.98d36cb4-5706-4489-b714-4ab930310b4c")
-)
-def Get_Episode_Max_Min_Dates(get_PPS_episodes):
+def get_episode_max_min_dates(get_PPS_episodes):
     from pyspark.sql.functions import expr
     df = get_PPS_episodes
     df = df.groupby('personID','person_episode_number').agg(F.min(F.col('conceptDate')).alias('episode_min_date'),F.max(F.col('conceptDate')).alias('episode_max_date'))
     df = df.withColumn('episode_max_date_plus_two_months', expr("add_months(episode_max_date, 2)"))
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+def main():
+    input_GT_concepts_df = input_GT_concepts(condition_occurrence, procedure_occurrence, observation, measurement, visit_occurrence, PPS_concepts)
+    get_PPS_episodes_df = get_PPS_episodes(PPS_concepts, input_GT_concepts_df, person)   
+    PPS_episodes_df = get_episode_max_min_dates(get_PPS_episodes_df)
+    
+if __name__ == "__main__":
+    main()
