@@ -1,8 +1,6 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.f9be0a53-e0b8-40f1-a3db-32976387f18b"),
-    Matcho_concepts=Input(rid="ri.foundry.main.dataset.016535b1-e5e2-4ebb-936a-8d28dc31c573"),
-    concept=Input(rid="ri.foundry.main.dataset.5cb3c4a3-327a-47bf-a8bf-daf0cafe6772")
-)
+# external files
+Matcho_concepts = "Matcho_concepts.xlsx"
+
 def concepts_in_enclave(Matcho_concepts, concept):
     """
     Extract concepts from concept table.
@@ -16,10 +14,6 @@ def concepts_in_enclave(Matcho_concepts, concept):
     df = df.select(*keep_columns)
     return df.join(concept, "concept_id", "inner")
 
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.6d3f5850-eb02-4789-a214-a753709fac44"),
-    concepts_in_enclave=Input(rid="ri.foundry.main.dataset.f9be0a53-e0b8-40f1-a3db-32976387f18b")
-)
 def filter_non_standard(concepts_in_enclave):
     """
     Filter to non-standard concepts.
@@ -31,11 +25,6 @@ def filter_non_standard(concepts_in_enclave):
     df = df.filter(df.standard_concept.isNull())
     return df  
     
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.4ed4a74e-a49b-42a2-a7f3-b87052f06e06"),
-    concepts_in_enclave=Input(rid="ri.foundry.main.dataset.f9be0a53-e0b8-40f1-a3db-32976387f18b")
-)
 def filter_standard(concepts_in_enclave):
     """
     Filter to standard concepts.
@@ -47,12 +36,6 @@ def filter_standard(concepts_in_enclave):
     df = df.filter(df.standard_concept=="S")
     return df  
     
-   
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.1ac04e5c-d261-4895-9bc5-95a7975ec8c2"),
-    concept_relationship=Input(rid="ri.foundry.main.dataset.0469a283-692e-4654-bb2e-26922aff9d71"),
-    filter_non_standard=Input(rid="ri.foundry.main.dataset.6d3f5850-eb02-4789-a214-a753709fac44")
-)
 def map_to_standard(filter_non_standard, concept_relationship):
     """
     Map non-standard concepts to standard concepts using the concept_relationship table.
@@ -70,12 +53,6 @@ def map_to_standard(filter_non_standard, concept_relationship):
     mapped_concepts = mapped_concepts.filter(mapped_concepts.relationship_id=="Maps to")
     return mapped_concepts
 
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.fe926552-29fa-4e90-82ac-72af0636e802"),
-    concept=Input(rid="ri.foundry.main.dataset.5cb3c4a3-327a-47bf-a8bf-daf0cafe6772"),
-    map_to_standard=Input(rid="ri.foundry.main.dataset.1ac04e5c-d261-4895-9bc5-95a7975ec8c2")
-)
 def get_standard_columns(map_to_standard, concept):
     """
     Get concept info from concept table for concepts mapped to standard concepts.
@@ -92,12 +69,6 @@ def get_standard_columns(map_to_standard, concept):
     updated_final = updated_concepts.join(concepts, "concept_id", "inner")
     return updated_final
 
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.dc089337-ee33-432d-81db-1526c8b9f3d6"),
-    filter_standard=Input(rid="ri.foundry.main.dataset.4ed4a74e-a49b-42a2-a7f3-b87052f06e06"),
-    get_standard_columns=Input(rid="ri.foundry.main.dataset.fe926552-29fa-4e90-82ac-72af0636e802")
-)
 def combine_tables(get_standard_columns, filter_standard):
     """
     Combine tables of standard concepts.
@@ -109,5 +80,16 @@ def combine_tables(get_standard_columns, filter_standard):
     updated = get_standard_columns
     standard = filter_standard
     union_df = standard.union(updated)
-    return union_df    
+    return union_df  
+
+def main():
+    concepts_in_enclave_df = concepts_in_enclave(Matcho_concepts, concept)
+    filter_non_standard_df = filter_non_standard(concepts_in_enclave_df)
+    filter_standard_df = filter_standard(concepts_in_enclave_df)
+    map_to_standard_df = map_to_standard(filter_non_standard_df, concept_relationship)
+    get_standard_columns_df = get_standard_columns(map_to_standard_df, concept)
+    Matcho_concepts_df = combine_tables(get_standard_columns_df, filter_standard)
+
+if __name__ == "__main__":
+    main()
 
