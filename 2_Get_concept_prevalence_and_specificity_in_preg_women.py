@@ -1,12 +1,6 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.46de9379-7821-4a91-a95d-ea014fcda530"),
-    Matcho_concepts=Input(rid="ri.foundry.main.dataset.dc089337-ee33-432d-81db-1526c8b9f3d6"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    drug_exposure=Input(rid="ri.foundry.main.dataset.a1779c72-990c-4b7f-925a-2422b7c423b5"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
+import pyspark.sql.functions as F
+from pyspark.sql.types import IntegerType
+
 def filter_to_persons_with_concepts(procedure_occurrence, measurement, observation, condition_occurrence, drug_exposure, Matcho_concepts):
     """
     Identify persons with a concept from a table with concepts of interest. 
@@ -18,7 +12,7 @@ def filter_to_persons_with_concepts(procedure_occurrence, measurement, observati
     observation
     condition_occurrence
     drug_exposure
-    Matcho_concepts - table with concepts of interest 
+    Matcho_concepts_df - table with concepts of interest 
     """
 
     preg_df = Matcho_concepts
@@ -56,12 +50,6 @@ def filter_to_persons_with_concepts(procedure_occurrence, measurement, observati
 
     return union_df.dropDuplicates()
 
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.58b69d5b-e7ec-4ab6-a6d3-ed1385a8098a"),
-    filter_to_persons_with_concepts=Input(rid="ri.foundry.main.dataset.46de9379-7821-4a91-a95d-ea014fcda530"),
-    person=Input(rid="ri.foundry.main.dataset.14c52391-0344-41ac-909a-71f8e19704d6")
-)
 def persons_with_concepts(person, filter_to_persons_with_concepts):
     """
     Filter person table for persons with a concept of interest.
@@ -83,24 +71,6 @@ def persons_with_concepts(person, filter_to_persons_with_concepts):
     
     return df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.c8052b7d-9e6c-4e36-85a0-b4d42224d70b"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    drug_exposure=Input(rid="ri.foundry.main.dataset.a1779c72-990c-4b7f-925a-2422b7c423b5"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    persons_with_concepts=Input(rid="ri.foundry.main.dataset.58b69d5b-e7ec-4ab6-a6d3-ed1385a8098a"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
 def get_all_concepts(persons_with_concepts, observation, measurement, procedure_occurrence, condition_occurrence, drug_exposure):
     """
     Get all records from the domain tables listed below for every person with a concept of interest.
@@ -173,18 +143,6 @@ def get_all_concepts(persons_with_concepts, observation, measurement, procedure_
 
     return union_df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.9f3ce88e-e317-42e4-8a0a-0e4ccf31b417"),
-    get_all_concepts=Input(rid="ri.foundry.main.dataset.c8052b7d-9e6c-4e36-85a0-b4d42224d70b")
-)
 def filter_to_women_of_reproductive_age(get_all_concepts):
     """
     Filter to records belonging to women of reproductive age (15-55).
@@ -197,19 +155,6 @@ def filter_to_women_of_reproductive_age(get_all_concepts):
     df = df.filter((df.age >= 15) & (df.age < 56))
     return df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.b9f3e24c-41c5-46a6-9fb1-10ebc39281bc"),
-    filter_to_persons_with_concepts=Input(rid="ri.foundry.main.dataset.46de9379-7821-4a91-a95d-ea014fcda530"),
-    person=Input(rid="ri.foundry.main.dataset.14c52391-0344-41ac-909a-71f8e19704d6")
-)
 def persons_without_concepts(person, filter_to_persons_with_concepts):
     """
     Filter person table for persons without a concept of interest.
@@ -234,18 +179,6 @@ def persons_without_concepts(person, filter_to_persons_with_concepts):
 
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.299b6cc8-28df-48a6-89cd-921095d5f6c8"),
-    filter_to_women_of_reproductive_age=Input(rid="ri.foundry.main.dataset.9f3ce88e-e317-42e4-8a0a-0e4ccf31b417")
-)
 def get_count_and_proportion(filter_to_women_of_reproductive_age):
     """
     Calculate count and proportion of unique persons by concept.
@@ -271,19 +204,7 @@ def get_count_and_proportion(filter_to_women_of_reproductive_age):
     count_df = count_df.filter(~F.col("concept_name").isNull())
 
     return count_df
-    
-#################################################
-## Global imports and functions included below ##
-#################################################
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.d75861a8-1998-4d34-a535-56cee19f2ed6"),
-    get_count_and_proportion=Input(rid="ri.foundry.main.dataset.299b6cc8-28df-48a6-89cd-921095d5f6c8")
-)
 def filter_to_frequent_concepts(get_count_and_proportion):
     """
     Filter to frequent concepts (count > 1000).
@@ -295,24 +216,6 @@ def filter_to_frequent_concepts(get_count_and_proportion):
     df = df.filter(F.col("count") > 1000)
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.d532051c-37db-4662-9586-95f2109520e7"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    drug_exposure=Input(rid="ri.foundry.main.dataset.a1779c72-990c-4b7f-925a-2422b7c423b5"),
-    filter_to_frequent_concepts=Input(rid="ri.foundry.main.dataset.d75861a8-1998-4d34-a535-56cee19f2ed6"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    persons_without_concepts=Input(rid="ri.foundry.main.dataset.b9f3e24c-41c5-46a6-9fb1-10ebc39281bc"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
 def get_frequent_concepts(filter_to_frequent_concepts, persons_without_concepts, observation, measurement, procedure_occurrence, condition_occurrence, drug_exposure):
     """
     Get all records of frequent concepts from the domain tables listed below for every person without a concept of interest.
@@ -382,18 +285,6 @@ def get_frequent_concepts(filter_to_frequent_concepts, persons_without_concepts,
 
     return union_df    
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.c33fbb1d-cfbb-4e25-a504-1fe8f7f303fd"),
-    get_frequent_concepts=Input(rid="ri.foundry.main.dataset.d532051c-37db-4662-9586-95f2109520e7")
-)
 def get_count_and_proportion_for_controls(get_frequent_concepts):
     """
     Calculate count and proportion of unique persons by concept.
@@ -413,20 +304,6 @@ def get_count_and_proportion_for_controls(get_frequent_concepts):
 
     return count_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.7db8cbd7-6350-4a7d-a1f6-df445f6d818f"),
-    filter_to_frequent_concepts=Input(rid="ri.foundry.main.dataset.d75861a8-1998-4d34-a535-56cee19f2ed6"),
-    get_count_and_proportion_for_controls=Input(rid="ri.foundry.main.dataset.c33fbb1d-cfbb-4e25-a504-1fe8f7f303fd"),
-    get_frequent_concepts=Input(rid="ri.foundry.main.dataset.d532051c-37db-4662-9586-95f2109520e7")
-)
 def count_and_proportion_all(get_count_and_proportion_for_controls, filter_to_frequent_concepts, get_frequent_concepts):
     """
     Combine tables of count and proportion by concept for cases and controls and calculate the ratio of proportions.
@@ -456,18 +333,6 @@ def count_and_proportion_all(get_count_and_proportion_for_controls, filter_to_fr
     
     return df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.6fa29bb6-ec86-4d4d-b564-95fb21d486ca"),
-    count_and_proportion_all=Input(rid="ri.foundry.main.dataset.7db8cbd7-6350-4a7d-a1f6-df445f6d818f")
-)
 def highly_specific_table(count_and_proportion_all):
     """
     Get highly specific concepts with a ratio greater than 10.
@@ -475,9 +340,18 @@ def highly_specific_table(count_and_proportion_all):
     df = count_and_proportion_all.filter(F.col('ratio') > 10)
     return df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
+def main():
+    filter_to_persons_with_concepts_df = filter_to_persons_with_concepts(procedure_occurrence, measurement, observation, condition_occurrence, drug_exposure, Matcho_concepts_df)
+    persons_with_concepts_df = persons_with_concepts(person, filter_to_persons_with_concepts_df)
+    get_all_concepts_df = get_all_concepts(persons_with_concepts_df, observation, measurement, procedure_occurrence, condition_occurrence, drug_exposure)
+    filter_to_women_of_reproductive_age_df = filter_to_women_of_reproductive_age(get_all_concepts_df)
+    persons_without_concepts_df = persons_without_concepts(person, filter_to_persons_with_concepts_df)
+    get_count_and_proportion_df = get_count_and_proportion(filter_to_women_of_reproductive_age_df)
+    filter_to_frequent_concepts_df = filter_to_frequent_concepts(get_count_and_proportion_df)
+    get_frequent_concepts_df = get_frequent_concepts(filter_to_frequent_concepts_df, persons_without_concepts_df, observation, measurement, procedure_occurrence, condition_occurrence, drug_exposure)
+    get_count_and_proportion_for_controls_df = get_count_and_proportion_for_controls(get_frequent_concepts_df)
+    count_and_proportion_all_df = count_and_proportion_all(get_count_and_proportion_for_controls_df, filter_to_frequent_concepts_df, get_frequent_concepts_df)
+    highly_specific_table_df = highly_specific_table(count_and_proportion_all_df)
 
-import pyspark.sql.functions as F
-from pyspark.sql.window import Window
+if __name__ == "__main__":
+    main()
