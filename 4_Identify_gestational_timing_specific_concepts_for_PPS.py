@@ -2,23 +2,16 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from pyspark.sql.types import IntegerType
 
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.5caee4b7-2879-49e4-8e49-c600bc958ee8"),
-    Highly_specific_concepts=Input(rid="ri.foundry.main.dataset.6fa29bb6-ec86-4d4d-b564-95fb21d486ca"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    drug_exposure=Input(rid="ri.foundry.main.dataset.a1779c72-990c-4b7f-925a-2422b7c423b5"),
-    final_episodes_with_length=Input(rid="ri.foundry.main.dataset.1da2194d-3770-4152-a468-8b4d0661ba86"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
-def get_domain_concepts_per_episode(final_episodes_with_length, drug_exposure, observation, measurement, procedure_occurrence, condition_occurrence, Highly_specific_concepts):
+# external files
+Highly_specific_concepts = "Highly_specific_concepts.xlsx"
+
+def get_domain_concepts_per_episode(HIP_episodes, drug_exposure, observation, measurement, procedure_occurrence, condition_occurrence, Highly_specific_concepts):
     '''
     for every HIP episode:
         1. get all the domain concepts and their dates within the pregnancy dates
         2. preserve the final outcome date and category, and pregnancy start date, per concept
     '''
-    pregnant_dates = final_episodes_with_length.select('person_id','episode','estimated_start_date','visit_date','category').filter(~(F.col('category') == 'PREG')).filter(~(F.col('category') == 'DELIV'))
+    pregnant_dates = HIP_episodes.select('person_id','episode','estimated_start_date','visit_date','category').filter(~(F.col('category') == 'PREG')).filter(~(F.col('category') == 'DELIV'))
     pregnant_dates = pregnant_dates.withColumnRenamed('estimated_start_date','start_date_of_pregnancy')
     pregnant_dates = pregnant_dates.withColumnRenamed('visit_date','end_date')
 
@@ -58,11 +51,6 @@ def get_domain_concepts_per_episode(final_episodes_with_length, drug_exposure, o
     preg_related_concepts = (((c_o.unionByName(p_o)).unionByName(o_df)).unionByName(m_df)).unionByName(d_e)
     return preg_related_concepts
 
-    
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.a9060139-2270-4923-84a1-a749053bbc6f"),
-    get_domain_concepts_per_episode=Input(rid="ri.foundry.main.dataset.5caee4b7-2879-49e4-8e49-c600bc958ee8")
-)
 def get_gestational_timing_info_per_concept(get_domain_concepts_per_episode):
 
     '''
@@ -82,11 +70,6 @@ def get_gestational_timing_info_per_concept(get_domain_concepts_per_episode):
 
     return df
     
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.19269079-c479-4a63-b914-2c4db58238f2"),
-    get_gestational_timing_info_per_concept=Input(rid="ri.foundry.main.dataset.a9060139-2270-4923-84a1-a749053bbc6f")
-)
 def reformat_and_rem_highly_variable_timing_concepts(get_gestational_timing_info_per_concept):
     '''
     1. for each outcome and concept, get percent of episodes that have that concept 
@@ -143,14 +126,17 @@ def reformat_and_rem_highly_variable_timing_concepts(get_gestational_timing_info
 
     return df
 
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.c521bcb8-7ab7-473a-8ef3-e16404247662"),
-    get_gestational_timing_info_per_concept=Input(rid="ri.foundry.main.dataset.a9060139-2270-4923-84a1-a749053bbc6f"),
-    reformat_and_rem_highly_variable_timing_concepts=Input(rid="ri.foundry.main.dataset.19269079-c479-4a63-b914-2c4db58238f2")
-)
 def get_unique_GT_specific_concepts_for_curation(reformat_and_rem_highly_variable_timing_concepts, get_gestational_timing_info_per_concept):
     df = reformat_and_rem_highly_variable_timing_concepts.select('domain_concept_id','domain_concept_name').distinct()
     df_overall_mean_and_stddev = df.join(get_gestational_timing_info_per_concept,['domain_concept_id','domain_concept_name'],'inner')
     df_overall_mean_and_stddev = df_overall_mean_and_stddev.groupBy('domain_concept_id','domain_concept_name').agg(F.mean(F.col('gestation_month')).alias('mean_gestation_month'), F.stddev(F.col('gestation_month')).alias('stddev_gestation_month'),F.countDistinct('person_id').alias('distinct_patients'))
     return df_overall_mean_and_stddev
+
+def main():
+    get_domain_concepts_per_episode_df = get_domain_concepts_per_episode(HIP_episodes_df, drug_exposure, observation, measurement, procedure_occurrence, condition_occurrence, Highly_specific_concepts)
+    get_gestational_timing_info_per_concept_df = get_gestational_timing_info_per_concept(get_domain_concepts_per_episode_df)
+    reformat_and_rem_highly_variable_timing_concepts_df = reformat_and_rem_highly_variable_timing_concepts(get_gestational_timing_info_per_concept_df)
+    get_unique_GT_specific_concepts_for_curation_df = get_unique_GT_specific_concepts_for_curation(reformat_and_rem_highly_variable_timing_concepts_df, get_gestational_timing_info_per_concept_df):
+
+if __name__ == "__main__":
+    main()
