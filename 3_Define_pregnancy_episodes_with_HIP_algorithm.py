@@ -1,13 +1,14 @@
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4"),
-    condition_occurrence=Input(rid="ri.foundry.main.dataset.db571f18-bdff-4310-92ed-5e71625f40a3"),
-    measurement=Input(rid="ri.foundry.main.dataset.8ce02960-4ca2-4adf-b96e-f8d55e14f548"),
-    observation=Input(rid="ri.foundry.main.dataset.d44db8a2-709a-4265-b59f-bb929ebf1d54"),
-    person=Input(rid="ri.foundry.main.dataset.14c52391-0344-41ac-909a-71f8e19704d6"),
-    HIP_concepts=Input(rid="ri.foundry.main.dataset.fcfbcea4-6ae0-4423-8b33-e5b22c062d2f"),
-    procedure_occurrence=Input(rid="ri.foundry.main.dataset.b6a1e256-c72f-4a66-9192-643fe063c631")
-)
-def initial_pregnant_cohort(procedure_occurrence, measurement, observation, condition_occurrence, HI_concepts, person):
+import pyspark.sql.functions as F
+from pyspark.sql.types import IntegerType, DateType, StringType
+from pyspark.sql.window import Window
+import pandas as pd
+
+# external files
+HIP_concepts = "HIP_concepts.xlsx"
+Matcho_outcome_limits = "Matcho_outcome_limits.xlsx"
+Matcho_term_durations = "Matcho_term_durations.xlsx"
+
+def initial_pregnant_cohort(procedure_occurrence, measurement, observation, condition_occurrence, HIP_concepts, person):
     """
     Get concepts specific for pregnancy from domain tables.
     """
@@ -80,41 +81,6 @@ def initial_pregnant_cohort(procedure_occurrence, measurement, observation, cond
 
     return union_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType
-from pyspark.sql.window import Window
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.fcfbcea4-6ae0-4423-8b33-e5b22c062d2f"),
-    gestation_concepts=Input(rid="ri.foundry.main.dataset.176860eb-6e18-4869-9968-07d7b7bf8f18"),
-    get_outcome_concepts=Input(rid="ri.foundry.main.dataset.757bd503-37c7-40e6-959c-9e1ef62165ed")
-)
-def pregnancy_concepts(get_outcome_concepts, gestation_concepts):
-    """
-    Join outcome-based concepts and gestation-based concepts.
-    """
-    #preg_df = gestation_concepts.union(get_outcome_concepts)
-    preg_df = get_outcome_concepts
-    
-    return preg_df
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType
-from pyspark.sql.window import Window
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.668161d0-a610-48b1-a496-87df9ed6f3ec"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def stillbirth_visits(initial_pregnant_cohort):
     """
     Get all stillbirth visits.
@@ -124,21 +90,7 @@ def stillbirth_visits(initial_pregnant_cohort):
     # drop duplicate rows on person_id and visit_date
     df = df.dropDuplicates(["person_id", "visit_date"])
     return df
-    
-#################################################
-## Global imports and functions included below ##
-#################################################
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.fe3fb857-c512-4c88-ba99-d4d8d5800702"),
-    stillbirth_visits=Input(rid="ri.foundry.main.dataset.668161d0-a610-48b1-a496-87df9ed6f3ec")
-)
 def stillbirth_temp(stillbirth_visits):
     """
     Get number of days between each visit.
@@ -149,22 +101,6 @@ def stillbirth_temp(stillbirth_visits):
  
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.08b091a1-360c-486d-ba78-bba177ddbe39"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f"),
-    stillbirth_temp=Input(rid="ri.foundry.main.dataset.fe3fb857-c512-4c88-ba99-d4d8d5800702"),
-    stillbirth_visits=Input(rid="ri.foundry.main.dataset.668161d0-a610-48b1-a496-87df9ed6f3ec")
-)
 def final_stillbirth_visits(stillbirth_temp, stillbirth_visits, Matcho_outcome_limits):
     """
     Get earliest stillbirth visit per patient and any stillbirth visit after minimum outcome days.
@@ -205,20 +141,6 @@ def final_stillbirth_visits(stillbirth_temp, stillbirth_visits, Matcho_outcome_l
 
     return all_df
     
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.a85a2c97-6f4c-4749-b6a1-6a0a9bd6662f"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def livebirth_visits(initial_pregnant_cohort):
     """
     Get all livebirth visits.
@@ -229,20 +151,6 @@ def livebirth_visits(initial_pregnant_cohort):
     df = df.dropDuplicates(["person_id", "visit_date"])
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.9843c362-d6da-4c0d-85d4-16921deed9c1"),
-    livebirth_visits=Input(rid="ri.foundry.main.dataset.a85a2c97-6f4c-4749-b6a1-6a0a9bd6662f")
-)
 def livebirth_temp(livebirth_visits):
     """
     Get number of days between each visit.
@@ -254,22 +162,6 @@ def livebirth_temp(livebirth_visits):
  
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.0cd30215-f981-42a2-9c4f-f5eb4c068174"),
-    livebirth_temp=Input(rid="ri.foundry.main.dataset.9843c362-d6da-4c0d-85d4-16921deed9c1"),
-    livebirth_visits=Input(rid="ri.foundry.main.dataset.a85a2c97-6f4c-4749-b6a1-6a0a9bd6662f"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def final_livebirth_visits(livebirth_temp, livebirth_visits, Matcho_outcome_limits):
     """
     Get earliest livebirth visit per patient and any livebirth visit after minimum outcome days.
@@ -311,20 +203,6 @@ def final_livebirth_visits(livebirth_temp, livebirth_visits, Matcho_outcome_limi
 
     return all_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.6a818b80-4e83-41ae-af62-0627222b9d89"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def ectopic_visits(initial_pregnant_cohort):
     """
     Get ectopic pregnancy visits.
@@ -335,21 +213,6 @@ def ectopic_visits(initial_pregnant_cohort):
     df = df.dropDuplicates(["person_id", "visit_date"])
     return df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.f879b0d3-bcbd-4e9a-8217-141bf800efd4"),
-    ectopic_visits=Input(rid="ri.foundry.main.dataset.6a818b80-4e83-41ae-af62-0627222b9d89")
-)
 def ectopic_temp(ectopic_visits):
     """
     Get number of days between each visit.
@@ -360,22 +223,6 @@ def ectopic_temp(ectopic_visits):
  
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.9b05a6aa-78aa-4379-96bb-c1148e888919"),
-    ectopic_temp=Input(rid="ri.foundry.main.dataset.f879b0d3-bcbd-4e9a-8217-141bf800efd4"),
-    ectopic_visits=Input(rid="ri.foundry.main.dataset.6a818b80-4e83-41ae-af62-0627222b9d89"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def final_ectopic_visits(ectopic_temp, ectopic_visits, Matcho_outcome_limits):
     """
     Get earliest ectopic pregnancy visit per patient and any ectopic pregnancy visit after minimum outcome days.
@@ -417,20 +264,6 @@ def final_ectopic_visits(ectopic_temp, ectopic_visits, Matcho_outcome_limits):
 
     return all_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.69ddf1f1-e8e7-4c9a-abc6-815c344977ce"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def delivery_visits(initial_pregnant_cohort):
     """
     Get all delivery record visits only.
@@ -441,21 +274,6 @@ def delivery_visits(initial_pregnant_cohort):
     df = df.dropDuplicates(["person_id", "visit_date"])
     return df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.c378a897-9703-48ca-ac05-879e27cf6398"),
-    delivery_visits=Input(rid="ri.foundry.main.dataset.69ddf1f1-e8e7-4c9a-abc6-815c344977ce")
-)
 def delivery_temp(delivery_visits):
     """
     Get number of days between each visit.
@@ -466,22 +284,6 @@ def delivery_temp(delivery_visits):
  
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.29d5c266-bf0d-4751-8a8a-e2c9ce7e7535"),
-    delivery_temp=Input(rid="ri.foundry.main.dataset.c378a897-9703-48ca-ac05-879e27cf6398"),
-    delivery_visits=Input(rid="ri.foundry.main.dataset.69ddf1f1-e8e7-4c9a-abc6-815c344977ce"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def final_delivery_visits(delivery_temp, delivery_visits, Matcho_outcome_limits):
     """
     Get earliest delivery visit per patient and any delivery visit after minimum outcome days.
@@ -522,20 +324,6 @@ def final_delivery_visits(delivery_temp, delivery_visits, Matcho_outcome_limits)
 
     return all_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.d2d1c440-500c-4ac0-941f-baaf55f25aa3"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def abortion_visits(initial_pregnant_cohort):
     """
     Get abortion visits - AB (abortion) and SA (spontaneous abortion).
@@ -546,20 +334,6 @@ def abortion_visits(initial_pregnant_cohort):
     df = df.dropDuplicates(["person_id", "visit_date"])
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.82fd69c2-2ef7-4e4b-a255-81ffa3fb5129"),
-    abortion_visits=Input(rid="ri.foundry.main.dataset.d2d1c440-500c-4ac0-941f-baaf55f25aa3")
-)
 def abortion_temp(abortion_visits):
     """
     Get number of days between each visit.
@@ -571,22 +345,6 @@ def abortion_temp(abortion_visits):
  
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.2d25bcd2-04e1-49a4-9f74-5adda75fb469"),
-    abortion_temp=Input(rid="ri.foundry.main.dataset.82fd69c2-2ef7-4e4b-a255-81ffa3fb5129"),
-    abortion_visits=Input(rid="ri.foundry.main.dataset.d2d1c440-500c-4ac0-941f-baaf55f25aa3"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def final_abortion_visits(abortion_temp, abortion_visits, Matcho_outcome_limits):
     """
     Get earliest abortion visit per patient and any abortion visit after minimum outcome days.
@@ -627,23 +385,7 @@ def final_abortion_visits(abortion_temp, abortion_visits, Matcho_outcome_limits)
     print(all_df.count())
 
     return all_df
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.4517e481-6165-409e-9a41-476209b883fc"),
-    final_livebirth_visits=Input(rid="ri.foundry.main.dataset.0cd30215-f981-42a2-9c4f-f5eb4c068174"),
-    final_stillbirth_visits=Input(rid="ri.foundry.main.dataset.08b091a1-360c-486d-ba78-bba177ddbe39"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
+                            
 def add_stillbirth(final_stillbirth_visits, final_livebirth_visits, Matcho_outcome_limits):
     """
     Add stillbirth visits to livebirth visits table.
@@ -731,22 +473,6 @@ def add_stillbirth(final_stillbirth_visits, final_livebirth_visits, Matcho_outco
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.27fdf3bd-06b6-4a79-b1ea-0ed0fe88ee2a"),
-    add_stillbirth=Input(rid="ri.foundry.main.dataset.4517e481-6165-409e-9a41-476209b883fc"),
-    final_ectopic_visits=Input(rid="ri.foundry.main.dataset.9b05a6aa-78aa-4379-96bb-c1148e888919"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def add_ectopic(add_stillbirth, Matcho_outcome_limits, final_ectopic_visits):
     """
     Add ectopic pregnancy visits.
@@ -848,22 +574,6 @@ def add_ectopic(add_stillbirth, Matcho_outcome_limits, final_ectopic_visits):
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.22b93b71-5b9c-4e1d-bb69-4749d80ffbf4"),
-    add_ectopic=Input(rid="ri.foundry.main.dataset.27fdf3bd-06b6-4a79-b1ea-0ed0fe88ee2a"),
-    final_abortion_visits=Input(rid="ri.foundry.main.dataset.2d25bcd2-04e1-49a4-9f74-5adda75fb469"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def add_abortion(add_ectopic, Matcho_outcome_limits, final_abortion_visits):
     """
     Add abortion visits - SA and AB are treated the same.
@@ -1018,22 +728,6 @@ def add_abortion(add_ectopic, Matcho_outcome_limits, final_abortion_visits):
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.e73aa3bd-7dff-4d85-892b-32ddeb9765a2"),
-    add_abortion=Input(rid="ri.foundry.main.dataset.22b93b71-5b9c-4e1d-bb69-4749d80ffbf4"),
-    final_delivery_visits=Input(rid="ri.foundry.main.dataset.29d5c266-bf0d-4751-8a8a-e2c9ce7e7535"),
-    Matcho_outcome_limits=Input(rid="ri.foundry.main.dataset.0967064b-7f43-4d9a-b904-72be220d7a3f")
-)
 def add_delivery(add_abortion, Matcho_outcome_limits, final_delivery_visits):
     """
     Add delivery record only visits.
@@ -1190,20 +884,6 @@ def add_delivery(add_abortion, Matcho_outcome_limits, final_delivery_visits):
 
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.ab4d4866-ec49-452d-a491-a6a7e2999eac"),
-    initial_pregnant_cohort=Input(rid="ri.foundry.main.dataset.0fbf0d95-7eae-4e02-89a4-dfaf801477c4")
-)
 def gestation_visits(initial_pregnant_cohort):
     """
     Filter to visits with gestation period.
@@ -1224,21 +904,6 @@ def gestation_visits(initial_pregnant_cohort):
     all_gest_df = gest_df.union(other_gest_df)
     return all_gest_df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.07ae9467-1ff6-4729-bd3a-ceec054e6424"),
-    gestation_visits=Input(rid="ri.foundry.main.dataset.ab4d4866-ec49-452d-a491-a6a7e2999eac")
-)
 def gestation_episodes(gestation_visits):
     """
     Define pregnancy episode per patient by gestational records.
@@ -1304,20 +969,6 @@ def gestation_episodes(gestation_visits):
 
     return df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.1e63d7d9-a51b-425c-9055-a51aec2eb72b"),
-    gestation_episodes=Input(rid="ri.foundry.main.dataset.07ae9467-1ff6-4729-bd3a-ceec054e6424")
-)
 def get_min_max_gestation(gestation_episodes):
     """
     Get the min and max gestational age in weeks and the corresponding visit dates per pregnancy episode.
@@ -1424,21 +1075,6 @@ def get_min_max_gestation(gestation_episodes):
 
     return all_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.d8684d42-a322-475f-8e69-609ff91738aa"),
-    Matcho_term_durations=Input(rid="ri.foundry.main.dataset.4dd018a7-1015-4a39-ad7e-426d3c881dcf"),
-    add_delivery=Input(rid="ri.foundry.main.dataset.e73aa3bd-7dff-4d85-892b-32ddeb9765a2")
-)
 def calculate_start(add_delivery, Matcho_term_durations):
     """
     Estimate start of pregnancies based on outcome type.
@@ -1457,22 +1093,6 @@ def calculate_start(add_delivery, Matcho_term_durations):
 
     return term_df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.c349f698-c4be-4c86-9a61-e6682f5dd6bb"),
-    calculate_start=Input(rid="ri.foundry.main.dataset.d8684d42-a322-475f-8e69-609ff91738aa"),
-    get_min_max_gestation=Input(rid="ri.foundry.main.dataset.1e63d7d9-a51b-425c-9055-a51aec2eb72b")
-)
 def add_gestation(calculate_start, get_min_max_gestation):
     """
     Add gestation-based episodes. Any gestation-based episode that overlaps with an outcome-based episode is removed as a distinct episode.
@@ -1689,22 +1309,7 @@ def add_gestation(calculate_start, get_min_max_gestation):
     
     return all_df
     
-
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.50bf3f84-626a-4a28-b5c5-03af73c2cef0"),
-    add_gestation=Input(rid="ri.foundry.main.dataset.c349f698-c4be-4c86-9a61-e6682f5dd6bb")
-)
-def Clean_episodes(add_gestation):
+def clean_episodes(add_gestation):
     """
     Clean up episodes by removing duplicate episodes and reclassifying outcome-based episodes as gestation-based episodes if the outcome containing gestational info does not fall within the term durations defined by Matcho et al. 
     """    
@@ -1862,25 +1467,11 @@ def Clean_episodes(add_gestation):
     
     return final_df
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.dc0e0380-ba0d-4084-8a6a-47405bf36f47"),
-    Clean_episodes=Input(rid="ri.foundry.main.dataset.50bf3f84-626a-4a28-b5c5-03af73c2cef0")
-)
-def Remove_overlaps(Clean_episodes):
+def remove_overlaps(clean_episodes):
     """
     Identify episodes that overlap and keep only the latter episode if the previous episode is PREG. If the latter episode doesn't have gestational info, redefine the start date to be the previous date plus the retry period.  
     """ 
-    df = Clean_episodes
+    df = clean_episodes
 
     # get previous date
     df = df.withColumn("prev_date", F.lag(df.visit_date, 1).over(Window.partitionBy("person_id").orderBy("visit_date")))
@@ -1967,50 +1558,19 @@ def Remove_overlaps(Clean_episodes):
     print(final_df.filter(final_df.removed_outcome == 1).count())
 
     return final_df
-  
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.4b177674-7e58-4eb4-b3d6-92f5ec0d2159"),
-    Remove_overlaps=Input(rid="ri.foundry.main.dataset.dc0e0380-ba0d-4084-8a6a-47405bf36f47")
-)
-def final_episodes(Remove_overlaps):
+def final_episodes(remove_overlaps):
     """
     Keep subset of columns with episode start and end as well as category. Also include patient demographics.
     """
-    df = Remove_overlaps
+    df = remove_overlaps
     df = df.select("person_id","category","visit_date","estimated_start_date","episode","data_partner_id","year_of_birth","race_concept_name","ethnicity_concept_name")
     return df.drop_duplicates()
 
-#################################################
-## Global imports and functions included below ##
-#################################################
-
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
-
-
-@transform_pandas(
-    Output(rid="ri.foundry.main.dataset.1da2194d-3770-4152-a468-8b4d0661ba86"),
-    final_episodes=Input(rid="ri.foundry.main.dataset.4b177674-7e58-4eb4-b3d6-92f5ec0d2159"),
-    gestation_visits=Input(rid="ri.foundry.main.dataset.ab4d4866-ec49-452d-a491-a6a7e2999eac")
-)
-def Final_episodes_with_length(final_episodes, gestation_visits):
+def final_episodes_with_length(final_episodes, gestation_visits):
     """
     Find the first gestation record within an episode and calculate the episode length based on the date of the first gestation record and the visit date.
     """
-
     df = final_episodes
     gest_df = gestation_visits.select("person_id","gest_value","visit_date")
     gest_df = gest_df.withColumnRenamed("visit_date","gest_date")
@@ -2068,11 +1628,53 @@ def Final_episodes_with_length(final_episodes, gestation_visits):
 
     return final_df    
 
-#################################################
-## Global imports and functions included below ##
-#################################################
+def main():
+    # initial cohort
+    initial_pregnant_cohort_df = initial_pregnant_cohort(procedure_occurrence, measurement, observation, condition_occurrence, HIP_concepts, person)
+    
+    # get stillbirth episodes
+    stillbirth_visits_df = stillbirth_visits(initial_pregnant_cohort_df)
+    stillbirth_temp_df = stillbirth_temp(stillbirth_visits_df)
+    final_stillbirth_visits_df = final_stillbirth_visits(stillbirth_temp_df, stillbirth_visits_df, Matcho_outcome_limits)
+    
+    # get live birth episodes
+    livebirth_visits_df = livebirth_visits(initial_pregnant_cohort_df)
+    livebirth_temp_df = livebirth_temp(livebirth_visits_df)
+    final_livebirth_visits_df = final_livebirth_visits(livebirth_temp_df, livebirth_visits_df, Matcho_outcome_limits)
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType, DateType, StringType
-from pyspark.sql.window import Window
-import pandas as pd
+    # get ectopic episodes
+    ectopic_visits_df = ectopic_visits(initial_pregnant_cohort_df)
+    ectopic_temp_df = ectopic_temp(ectopic_visits_df)
+    final_ectopic_visits_df = final_ectopic_visits(ectopic_temp_df, ectopic_visits_df, Matcho_outcome_limits)
+    
+    # get delivery episodes
+    delivery_visits_df = delivery_visits(initial_pregnant_cohort_df)
+    delivery_temp_df = delivery_temp(delivery_visits_df)
+    final_delivery_visits_df = final_delivery_visits(delivery_temp_df, delivery_visits_df, Matcho_outcome_limits)
+
+    # get abortion episodes
+    abortion_visits_df = abortion_visits(initial_pregnant_cohort_df)
+    abortion_temp_df = abortion_temp(abortion_visits_df)
+    final_abortion_visits_df = final_abortion_visits(abortion_temp_df, abortion_visits_df, Matcho_outcome_limits)
+
+    # get gestation based episodes
+    gestation_visits_df = gestation_visits(initial_pregnant_cohort_df)
+    gestation_episodes_df = gestation_episodes(gestation_visits_df)
+    get_min_max_gestation_df = get_min_max_gestation(gestation_episodes_df)
+    
+    # combine episodes
+    add_stillbirth_df = add_stillbirth(final_stillbirth_visits_df, final_livebirth_visits_df, Matcho_outcome_limits)
+    add_ectopic_df = add_ectopic(add_stillbirth_df, Matcho_outcome_limits, final_ectopic_visits_df)
+    add_abortion_df = add_abortion(add_ectopic_df, Matcho_outcome_limits, final_abortion_visits_df)
+    add_delivery_df = add_delivery(add_abortion_df, Matcho_outcome_limits, final_delivery_visits_df)
+    calculate_start_df = calculate_start(add_delivery_df, Matcho_term_durations)
+    add_gestation_df = add_gestation(calculate_start_df, get_min_max_gestation_df)
+
+    # finalize episodes
+    clean_episodes_df = clean_episodes(add_gestation_df)
+    remove_overlaps_df = remove_overlaps(clean_episodes_df)
+    final_episodes_df = final_episodes(remove_overlaps_df)
+    HIP_episodes_df = final_episodes_with_length(final_episodes_df, gestation_visits_df)
+   
+if __name__ == "__main__":
+    main()
