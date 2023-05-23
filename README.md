@@ -2,7 +2,7 @@
 Code used to define cohort eras (episodes) during which persons are pregnant in the National COVID Cohort Collaborative (N3C).
 
 ## Overview
-Here we infer pregnancy episodes and their gestational timing for pregnancies of women recorded in OMOP Electronic Health Records across multiple data partner sites, using pooled data from the National Cohort Collaborative (N3C).
+Here we infer pregnancy episodes and gestational age from electronic health records in the OMOP Common Data Model using pooled data from the National COVID Cohort Collaborative (N3C) across multiple data partner sites.
 
 Our comprehensive approach, named **Hierarchy and rule-based pregnancy episode Inference integrated with Pregnancy Progression Signatures (HIPPS)** combines the following algorithms: 
 1. **Hierarchy-based Inference of Pregnancy (HIP) Algorithm**: A rule-based algorithm that is an extension of a previously published pregnancy episode algorithm ([Matcho et al](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0192033)). 
