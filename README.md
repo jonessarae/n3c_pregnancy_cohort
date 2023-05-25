@@ -11,7 +11,7 @@ Our comprehensive approach, named **Hierarchy and rule-based pregnancy episode I
 
 ## Steps for Reuse
 
-We modified each script to include a main function that details the sequence or order of the functions. Please modify the paths to any external files within the scripts if not using the external files contained in this repository. 
+We modified each script to include a main function that details the sequence or order of the functions. Please modify the paths to any external files within the scripts if not using the external files contained in this repository. Input files for each script are detailed in bullet points within each step.
 
 1. Run [1_Map_external_concepts_to_standard_OMOP_concepts.py](https://github.com/jonessarae/n3c_pregnancy_cohort/blob/main/1_Map_external_concepts_to_standard_OMOP_concepts.py) 
      * OMOP tables *concept* and *concept_relationship*
